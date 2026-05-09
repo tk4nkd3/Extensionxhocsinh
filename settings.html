@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cài đặt – Nhận Xét Học Sinh</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      width: 340px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+    .popup-header {
+      background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+      padding: 20px 24px 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .popup-header::after {
+      content: '';
+      position: absolute;
+      top: -30px; right: -20px;
+      width: 100px; height: 100px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 50%;
+    }
+    .popup-header h1 {
+      font-size: 18px; font-weight: 700; color: #fff;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .popup-header p {
+      font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 4px;
+    }
+    .popup-body {
+      padding: 20px 24px 24px;
+      display: flex; flex-direction: column; gap: 18px;
+    }
+    .field-group {
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .field-group label {
+      font-size: 12px; font-weight: 600; color: #94a3b8;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .field-group input {
+      width: 100%; padding: 10px 14px;
+      border: 1px solid rgba(148,163,184,0.2);
+      border-radius: 10px;
+      background: rgba(30,41,59,0.8);
+      color: #e2e8f0; font-size: 14px;
+      font-family: 'Inter', sans-serif;
+      transition: all 0.2s ease; outline: none;
+    }
+    .field-group input:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+    .row { display: flex; gap: 12px; }
+    .row .field-group { flex: 1; }
+    .btn-save {
+      width: 100%; padding: 12px; border: none; border-radius: 10px;
+      background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+      color: #fff; font-size: 14px; font-weight: 600;
+      font-family: 'Inter', sans-serif; cursor: pointer;
+      transition: all 0.25s ease;
+    }
+    .btn-save:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(99,102,241,0.35);
+    }
+    .btn-save.saved {
+      background: linear-gradient(135deg, #10b981, #059669);
+    }
+    .status-msg {
+      font-size: 12px; text-align: center; min-height: 18px;
+      transition: all 0.3s ease;
+    }
+    .status-msg.success { color: #10b981; }
+    .status-msg.error { color: #f43f5e; }
+    .hint {
+      font-size: 11px; color: #64748b; line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="popup-header">
+    <h1><span>📝</span> Nhận Xét Học Sinh</h1>
+    <p>Cài đặt thông tin bảng tính</p>
+  </div>
+
+  <div class="popup-body">
+    <p class="hint">Cấu hình cột chứa tên học sinh và dòng bắt đầu trong Google Sheets.</p>
+
+    <div class="row">
+      <div class="field-group">
+        <label>📋 Cột tên HS</label>
+        <input type="text" id="nameCol" placeholder="A" maxlength="2">
+      </div>
+      <div class="field-group">
+        <label>✏️ Cột nhận xét</label>
+        <input type="text" id="commentCol" placeholder="Q" maxlength="2">
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="field-group">
+        <label>📍 Dòng bắt đầu</label>
+        <input type="number" id="startRow" placeholder="2" min="1">
+      </div>
+    </div>
+
+    <button id="btnSave" class="btn-save">💾 Lưu cài đặt</button>
+    <p id="statusMsg" class="status-msg"></p>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>
