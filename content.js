@@ -85,7 +85,7 @@
               <input type="number" id="nxhs-colspan" value="1" min="1" max="15" style="width:36px; height:20px; font-size:11px; text-align:center; border:1px solid #cbd5e1; border-radius:4px; outline:none; color:#0f172a;">
             </div>
           </div>
-          <textarea id="nxhs-fast-input" spellcheck="false" placeholder="Nhập tên học sinh và lỗi lộn xộn thoải mái...\nVD:\nNam, hà anh love Ving to V\nVy interested in phải có be đằng trc, phong, hà hân..."></textarea>
+          <textarea id="nxhs-fast-input" spellcheck="false" placeholder="Nhập theo cú pháp Tên học sinh : Các lỗi\nVD:\nNam, hà anh : love Ving to V; chia sai động từ\nVy, phong, hà hân : interested in phải có be đằng trc"></textarea>
           <button id="nxhs-process-btn">📋 Xử Lý & Điền (Enter)</button>
         </div>
 
@@ -94,16 +94,17 @@
             <summary>📖 Hướng dẫn gõ tự do siêu tốc</summary>
             <div class="inst-content">
               <ul>
-                <li>Bạn có thể <strong>copy/paste nguyên xi</strong> đoạn chat hoặc ghi chú lộn xộn của bạn vào đây.</li>
-                <li>Tiện ích sẽ <strong>tự động nhận diện tên</strong> các học sinh có trong mỗi câu (dù tên nằm ở đầu, giữa hay cuối câu).</li>
-                <li>Nhấn <strong>Enter</strong>. Tiện ích tự động copy dữ liệu.</li>
-                <li>Ấn <strong>Ctrl + Shift + V</strong> ở màn hình Sheets để dán (Dùng Shift để giữ nguyên định dạng gộp ô).</li>
+                <li>Cú pháp chuẩn: <strong>Tên học sinh 1, Tên 2 : lỗi 1; lỗi 2</strong></li>
+                <li>Tiện ích sẽ tự động nhận diện tên học sinh ở bên trái dấu <strong>:</strong> và gắn các lỗi ở bên phải cho các em đó.</li>
+                <li>Nếu xuống dòng mà <strong>không có dấu :</strong>, hệ thống tự động cộng dồn lỗi cho học sinh ở dòng trên.</li>
+                <li>Nhấn <strong>Enter</strong> để tạo dữ liệu dán.</li>
+                <li>Ấn <strong>Ctrl + V</strong> ở màn hình Sheets để dán và giữ nguyên gộp ô.</li>
               </ul>
               <div class="inst-example">
                 VD:<br>
-                Nam, hà anh love Ving to V<br>
-                Vy interested in phải có be đằng trc, phong, hà hân<br>
-                Trí sue số ít V thêm s
+                Nam, hà anh : love Ving to V; thiếu s<br>
+                Vy, phong, hà hân : interested in phải có be đằng trc<br>
+                Trí : sue số ít V thêm s
               </div>
             </div>
           </details>
@@ -215,22 +216,31 @@
     for (const rawLine of lines) {
       if (!rawLine.trim()) continue;
 
-      let remainingLine = rawLine;
       let matchedStudents = new Set();
+      let namesPart = "";
+      let errorsPart = "";
 
-      // Dò tìm tất cả học sinh được nhắc đến trong câu này
-      for (const { student, regexStr } of aliasMap) {
-        // Regex bắt chính xác từ (word boundary hỗ trợ tiếng Việt)
-        const regex = new RegExp(`(^|[^\\p{L}])${regexStr}([^\\p{L}]|$)`, 'igu');
-        
-        if (regex.test(remainingLine)) {
-          matchedStudents.add(student);
-          // Xóa tên học sinh khỏi câu nhưng giữ lại khoảng trắng/dấu phẩy xung quanh
-          remainingLine = remainingLine.replace(regex, '$1$2');
+      // Tìm vị trí dấu : đầu tiên
+      const colonIndex = rawLine.indexOf(':');
+      if (colonIndex !== -1) {
+        namesPart = rawLine.substring(0, colonIndex);
+        errorsPart = rawLine.substring(colonIndex + 1);
+      } else {
+        // Không có dấu :, coi như là lỗi cộng dồn cho học sinh của dòng trước đó
+        errorsPart = rawLine;
+      }
+
+      if (namesPart.trim()) {
+        // Dò tìm tất cả học sinh được nhắc đến trong phần bên trái dấu :
+        for (const { student, regexStr } of aliasMap) {
+          const regex = new RegExp(`(^|[^\\p{L}])${regexStr}([^\\p{L}]|$)`, 'igu');
+          if (regex.test(namesPart)) {
+            matchedStudents.add(student);
+          }
         }
       }
 
-      // Kế thừa học sinh từ dòng trước nếu dòng này không nhắc tên ai (áp dụng lỗi tiếp cho HS cũ)
+      // Kế thừa học sinh từ dòng trước nếu dòng này không nhắc tên ai
       if (matchedStudents.size > 0) {
         lastMatchedStudents = matchedStudents;
       } else {
@@ -242,13 +252,11 @@
         continue;
       }
 
-      // --- BƯỚC 3: Xử lý đoạn text lỗi còn sót lại ---
-      let errorText = remainingLine.trim();
-      // Bỏ dấu câu dư thừa ở 2 đầu
+      // --- BƯỚC 3: Xử lý đoạn text lỗi ---
+      let errorText = errorsPart.trim();
+      // Bỏ các ký tự dư thừa ở đầu/cuối nếu có
       errorText = errorText.replace(/^[,;:\-\.\?\s]+/, '');
       errorText = errorText.replace(/[,;\-\s]+$/, '');
-      // Xóa các cụm dấu phẩy/chấm phẩy dư thừa do tên bị rút đi (vd: ", , ,")
-      errorText = errorText.replace(/[,;]\s*[,;]/g, ',');
       errorText = errorText.replace(/\s{2,}/g, ' ');
 
       if (!errorText) continue;
