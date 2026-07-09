@@ -23,8 +23,3 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Keep the message channel open for async responses
   return true;
 });
-
-// When the extension icon is clicked on a non-Sheets page, open settings
-chrome.action.onClicked.addListener((tab) => {
-  // The popup will handle this via default_popup
-});

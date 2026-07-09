@@ -85,7 +85,7 @@
               <input type="number" id="nxhs-colspan" value="1" min="1" max="15" style="width:36px; height:20px; font-size:11px; text-align:center; border:1px solid #cbd5e1; border-radius:4px; outline:none; color:#0f172a;">
             </div>
           </div>
-          <textarea id="nxhs-fast-input" spellcheck="false" placeholder="Nhập theo cú pháp Tên học sinh : Các lỗi\nVD:\nNam, hà anh : love Ving to V; chia sai động từ\nVy, phong, hà hân : interested in phải có be đằng trc"></textarea>
+          <textarea id="nxhs-fast-input" spellcheck="false" placeholder="Nhập theo cú pháp Tên học sinh : Các lỗi\nVD:\nNam, hà anh : love Ving to V; chia sai động từ\nVy : interested in phải có be đằng trc +phong +hà hân"></textarea>
           <button id="nxhs-process-btn">📋 Xử Lý & Điền (Enter)</button>
         </div>
 
@@ -96,6 +96,7 @@
               <ul>
                 <li>Cú pháp chuẩn: <strong>Tên học sinh 1, Tên 2 : lỗi 1; lỗi 2</strong></li>
                 <li>Tiện ích sẽ tự động nhận diện tên học sinh ở bên trái dấu <strong>:</strong> và gắn các lỗi ở bên phải cho các em đó.</li>
+                <li>Nhớ ra thêm học sinh nào cũng mắc lỗi y hệt <strong>sau khi</strong> đã viết lỗi? Gõ thêm <strong>+Tên</strong> ngay trong phần lỗi (VD: <strong>+phong +hà hân</strong>), không cần quay lại sửa trước dấu :.</li>
                 <li>Nếu xuống dòng mà <strong>không có dấu :</strong>, hệ thống tự động cộng dồn lỗi cho học sinh ở dòng trên.</li>
                 <li>Nhấn <strong>Enter</strong> để tạo dữ liệu dán.</li>
                 <li>Ấn <strong>Ctrl + V</strong> ở màn hình Sheets để dán và giữ nguyên gộp ô.</li>
@@ -103,7 +104,7 @@
               <div class="inst-example">
                 VD:<br>
                 Nam, hà anh : love Ving to V; thiếu s<br>
-                Vy, phong, hà hân : interested in phải có be đằng trc<br>
+                Vy : interested in phải có be đằng trc +phong +hà hân<br>
                 Trí : sue số ít V thêm s
               </div>
             </div>
@@ -174,30 +175,55 @@
     }
 
     // --- BƯỚC 1: Xây dựng bộ nhận diện tên học sinh (Aliases) ---
-    const aliasMap = [];
+    let aliasMap = [];
     function escapeRegExp(str) {
       return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
+    // Tên đầy đủ tiếng Việt = Họ + Tên đệm + Tên gọi (Tên gọi có thể 1 hoặc 2 từ,
+    // VD: "Nguyễn Trần Hà Anh" -> tên gọi là "Hà Anh", không phải chỉ "Anh")
     for (const s of state.students) {
       const name = s.name.toLowerCase().trim();
       const parts = name.split(/\s+/);
-      const aliases = [name]; // Full name
+      const aliases = new Set([name]); // Họ tên đầy đủ
 
       if (parts.length > 1) {
-        // Thêm tên gọi (từ cuối cùng) và họ (từ đầu tiên)
-        if (!aliases.includes(parts[parts.length - 1])) aliases.push(parts[parts.length - 1]);
-        if (!aliases.includes(parts[0])) aliases.push(parts[0]);
+        aliases.add(parts[parts.length - 1]); // Tên gọi 1 từ, VD: "Nam"
+        if (parts.length > 2) {
+          aliases.add(parts.slice(-2).join(' ')); // Tên gọi 2 từ, VD: "Hà Anh", "Minh Hùng"
+        }
+        aliases.add(parts[0]); // Họ, VD: "Nguyễn" (sẽ bị loại ở bước sau nếu trùng)
       }
 
       for (const al of aliases) {
         aliasMap.push({
           student: s,
           alias: al,
-          regexStr: escapeRegExp(al).replace(/\s+/g, '\\s+') // Chuyển khoảng trắng thành \s+ để bắt được khoảng trống bất kỳ
+          regexStr: escapeRegExp(al).replace(/\s+/g, '\\s+'), // Chuyển khoảng trắng thành \s+ để bắt được khoảng trống bất kỳ
+          isFull: al === name, // Alias này có phải là họ tên đầy đủ của học sinh không
         });
       }
     }
+
+    // Loại các alias trùng giữa từ 2 học sinh trở lên (VD: 2 em cùng tên gọi "Nam",
+    // hoặc cùng họ "Nguyễn") để tránh gán nhầm lỗi cho tất cả các em trùng tên.
+    // Chỉ loại khi vẫn còn cách gõ rõ hơn được (tức có ít nhất 1 HS trùng alias mà alias
+    // đó không phải họ tên đầy đủ của em -> em đó có thể gõ đầy đủ để phân biệt).
+    // Nếu alias trùng chính là họ tên đầy đủ của TẤT CẢ các em liên quan (VD 2 em trùng
+    // y hệt họ tên), không còn cách nào rõ hơn nữa nên vẫn giữ alias -> lỗi sẽ được gán
+    // cho cả các em trùng tên, thay vì chặn hoàn toàn không gán được cho ai.
+    const aliasToStudents = new Map(); // alias -> Map(student -> isFull)
+    for (const { alias, student, isFull } of aliasMap) {
+      if (!aliasToStudents.has(alias)) aliasToStudents.set(alias, new Map());
+      const studentMap = aliasToStudents.get(alias);
+      studentMap.set(student, studentMap.get(student) || isFull);
+    }
+    const ambiguousAliases = new Set(
+      Array.from(aliasToStudents.entries())
+        .filter(([, students]) => students.size > 1 && Array.from(students.values()).some((f) => !f))
+        .map(([alias]) => alias)
+    );
+    aliasMap = aliasMap.filter(({ alias }) => !ambiguousAliases.has(alias));
 
     // Ưu tiên khớp các cụm tên dài trước (như "Hà Anh" phải được ưu tiên hơn "Hà")
     aliasMap.sort((a, b) => {
@@ -238,6 +264,35 @@
             matchedStudents.add(student);
           }
         }
+      }
+
+      // Cú pháp "+Tên": nối thêm học sinh dùng chung lỗi ngay trong phần lỗi
+      // VD: "Vy : interested in... phải có be đằng trc +phong +hà hân"
+      // Lưu ý: chỉ xóa khỏi errorsPart những cụm "+..." THỰC SỰ khớp được với một học
+      // sinh có thật. Nếu xóa vô điều kiện mọi cụm "+chữ" sẽ phá hỏng các ký hiệu ngữ
+      // pháp tiếng Anh rất hay gặp trong nội dung lỗi (VD: "to + V", "S + V", "have + PII"),
+      // vì các cụm đó cũng khớp pattern "+chữ" nhưng không phải tên học sinh.
+      const plusNamePattern = /\+\s*([\p{L}][\p{L}\s]*?)(?=[+,;]|$)/gu;
+      let plusMatch;
+      const plusMatchesToRemove = [];
+      while ((plusMatch = plusNamePattern.exec(errorsPart)) !== null) {
+        const chunk = plusMatch[1].trim();
+        if (!chunk) continue;
+        let matchedAny = false;
+        for (const { student, regexStr } of aliasMap) {
+          const regex = new RegExp(`(^|[^\\p{L}])${regexStr}([^\\p{L}]|$)`, 'igu');
+          if (regex.test(chunk)) {
+            matchedStudents.add(student);
+            matchedAny = true;
+          }
+        }
+        if (matchedAny) {
+          plusMatchesToRemove.push([plusMatch.index, plusMatch[0].length]);
+        }
+      }
+      for (let i = plusMatchesToRemove.length - 1; i >= 0; i--) {
+        const [start, len] = plusMatchesToRemove[i];
+        errorsPart = errorsPart.slice(0, start) + ' ' + errorsPart.slice(start + len);
       }
 
       // Kế thừa học sinh từ dòng trước nếu dòng này không nhắc tên ai
@@ -339,7 +394,24 @@
     
     let previewText = parsedData.map(d => `[${d.name}]\n${d.comment}`).join('\n\n');
     if (notFoundLines && notFoundLines.length > 0) {
-      previewText = "⚠️ Không tìm thấy HS cho các dòng:\n" + notFoundLines.join("\n") + "\n\n" + previewText;
+      let warning = "⚠️ Không tìm thấy HS cho các dòng:\n" + notFoundLines.join("\n");
+
+      // Gợi ý cho các dòng bị bỏ qua vì tên gõ trùng với từ đã bị loại do nhiều HS chung tên
+      const hints = new Set();
+      for (const line of notFoundLines) {
+        for (const alias of ambiguousAliases) {
+          const regex = new RegExp(`(^|[^\\p{L}])${escapeRegExp(alias).replace(/\s+/g, '\\s+')}([^\\p{L}]|$)`, 'igu');
+          if (regex.test(line)) {
+            const names = Array.from(aliasToStudents.get(alias).keys()).map(s => s.name).join(', ');
+            hints.add(`"${alias}" trùng giữa nhiều HS (${names}) — hãy gõ rõ hơn (VD: kèm họ/tên đệm)`);
+          }
+        }
+      }
+      if (hints.size > 0) {
+        warning += "\n\n🔶 " + Array.from(hints).join("\n🔶 ");
+      }
+
+      previewText = warning + "\n\n" + previewText;
     }
     showPreview(previewText);
 
@@ -481,11 +553,16 @@
     nameBox.focus();
     nameBox.click();
     nameBox.value = cellRef;
-    
+
+    // Chỉ dùng "input" để cập nhật giá trị ô Name Box, KHÔNG bắn thêm sự kiện "change".
+    // Lý do: "change" khiến Sheets nhảy tới ô ngay và chuyển focus sang lưới bảng tính,
+    // nên phím Enter giả lập bắn ra sau đó (bên dưới) không còn xác nhận Name Box nữa mà
+    // bị lưới bảng tính hiểu là "di chuyển xuống 1 dòng" -> kết quả dán bị lệch xuống
+    // đúng 1 dòng so với học sinh mong muốn.
     nameBox.dispatchEvent(new Event('input', { bubbles: true }));
-    nameBox.dispatchEvent(new Event('change', { bubbles: true }));
-    
+
     setTimeout(() => {
+      nameBox.value = cellRef; // đảm bảo Sheets không tự đổi giá trị do gợi ý autocomplete
       nameBox.dispatchEvent(
         new KeyboardEvent('keydown', {
           key: 'Enter', keyCode: 13, code: 'Enter', which: 13,

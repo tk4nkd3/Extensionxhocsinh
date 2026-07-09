@@ -5,8 +5,7 @@
   "version": "2.0",
   "permissions": [
     "storage",
-    "activeTab",
-    "scripting"
+    "activeTab"
   ],
   "host_permissions": [
     "https://docs.google.com/spreadsheets/*"
