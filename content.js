@@ -233,6 +233,32 @@
       return b.alias.length - a.alias.length;
     });
 
+    // Dò tên trong một đoạn text theo kiểu "ăn dần" (consume): duyệt aliasMap đã sắp xếp
+    // dài-trước, mỗi khi khớp thì XÓA đúng đoạn text đó đi (thay bằng khoảng trắng) để các
+    // alias ngắn hơn không khớp lại vào phần chữ đã bị dùng.
+    // Đây là điểm mấu chốt: gõ "mai khanh" phải chỉ ra đúng em "... Mai Khanh", chứ không
+    // được đồng thời tính cho em tên "Mai" và em tên "Khanh".
+    // Dùng lookbehind/lookahead thay vì bắt ký tự bao quanh, để 2 tên viết liền nhau
+    // (VD: "mai, khanh") vẫn được dò hết chứ không bị nuốt mất dấu phân cách.
+    function collectStudents(text, targetSet) {
+      let remaining = text;
+      let matchedAny = false;
+      for (const { student, regexStr } of aliasMap) {
+        if (!/\p{L}/u.test(remaining)) break; // Hết chữ để dò
+        const regex = new RegExp(`(?<!\\p{L})${regexStr}(?!\\p{L})`, 'giu');
+        let hit = false;
+        remaining = remaining.replace(regex, (m) => {
+          hit = true;
+          return ' '.repeat(m.length); // Giữ nguyên độ dài để không xô lệch vị trí
+        });
+        if (hit) {
+          targetSet.add(student);
+          matchedAny = true;
+        }
+      }
+      return matchedAny;
+    }
+
     // --- BƯỚC 2: Phân tích từng dòng ---
     const lines = text.split('\n');
     const studentErrorsMap = new Map(); // Map: row -> { student, errors: Set() }
@@ -258,12 +284,7 @@
 
       if (namesPart.trim()) {
         // Dò tìm tất cả học sinh được nhắc đến trong phần bên trái dấu :
-        for (const { student, regexStr } of aliasMap) {
-          const regex = new RegExp(`(^|[^\\p{L}])${regexStr}([^\\p{L}]|$)`, 'igu');
-          if (regex.test(namesPart)) {
-            matchedStudents.add(student);
-          }
-        }
+        collectStudents(namesPart, matchedStudents);
       }
 
       // Cú pháp "+Tên": nối thêm học sinh dùng chung lỗi ngay trong phần lỗi
@@ -278,14 +299,7 @@
       while ((plusMatch = plusNamePattern.exec(errorsPart)) !== null) {
         const chunk = plusMatch[1].trim();
         if (!chunk) continue;
-        let matchedAny = false;
-        for (const { student, regexStr } of aliasMap) {
-          const regex = new RegExp(`(^|[^\\p{L}])${regexStr}([^\\p{L}]|$)`, 'igu');
-          if (regex.test(chunk)) {
-            matchedStudents.add(student);
-            matchedAny = true;
-          }
-        }
+        const matchedAny = collectStudents(chunk, matchedStudents);
         if (matchedAny) {
           plusMatchesToRemove.push([plusMatch.index, plusMatch[0].length]);
         }
