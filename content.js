@@ -85,7 +85,7 @@
               <input type="number" id="nxhs-colspan" value="1" min="1" max="15" style="width:36px; height:20px; font-size:11px; text-align:center; border:1px solid #cbd5e1; border-radius:4px; outline:none; color:#0f172a;">
             </div>
           </div>
-          <textarea id="nxhs-fast-input" spellcheck="false" placeholder="Nhập theo cú pháp Tên học sinh : Các lỗi\nVD:\nNam, hà anh : love Ving to V; chia sai động từ\nVy : interested in phải có be đằng trc +phong +hà hân"></textarea>
+          <textarea id="nxhs-fast-input" spellcheck="false" placeholder="Nhập theo cú pháp Họ tên đầy đủ : Các lỗi (tên phải gõ y như trên bảng)\nVD:\nTrần Văn Nam, Phạm Hà Anh : love Ving to V; chia sai động từ\nLê Khánh Vy : interested in phải có be đằng trc +Đỗ Hoài Phong"></textarea>
           <button id="nxhs-process-btn">📋 Xử Lý & Điền (Enter)</button>
         </div>
 
@@ -174,89 +174,65 @@
       return;
     }
 
-    // --- BƯỚC 1: Xây dựng bộ nhận diện tên học sinh (Aliases) ---
-    let aliasMap = [];
+    // --- BƯỚC 1: Bảng tra HỌ TÊN ĐẦY ĐỦ ---
+    // Chỉ nhận khi phần tên được gõ GIỐNG Y NGUYÊN họ tên trên bảng tính.
+    // Không còn đoán theo tên gọi / họ / tên đệm nữa: gõ "mai khanh" sẽ KHÔNG được tính
+    // cho em tên "Mai" và em tên "Khanh", mà phải gõ đủ "Nguyễn Thị Mai Khanh".
+    // Chỉ bỏ qua hai thứ không ảnh hưởng mặt chữ: viết hoa/thường và khoảng trắng thừa.
     function escapeRegExp(str) {
       return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
+    const normalizeName = (str) => str.toLowerCase().replace(/\s+/g, ' ').trim();
 
-    // Tên đầy đủ tiếng Việt = Họ + Tên đệm + Tên gọi (Tên gọi có thể 1 hoặc 2 từ,
-    // VD: "Nguyễn Trần Hà Anh" -> tên gọi là "Hà Anh", không phải chỉ "Anh")
+    const nameToStudents = new Map(); // họ tên đã chuẩn hoá -> danh sách HS
     for (const s of state.students) {
-      const name = s.name.toLowerCase().trim();
-      const parts = name.split(/\s+/);
-      const aliases = new Set([name]); // Họ tên đầy đủ
-
-      if (parts.length > 1) {
-        aliases.add(parts[parts.length - 1]); // Tên gọi 1 từ, VD: "Nam"
-        if (parts.length > 2) {
-          aliases.add(parts.slice(-2).join(' ')); // Tên gọi 2 từ, VD: "Hà Anh", "Minh Hùng"
-        }
-        aliases.add(parts[0]); // Họ, VD: "Nguyễn" (sẽ bị loại ở bước sau nếu trùng)
-      }
-
-      for (const al of aliases) {
-        aliasMap.push({
-          student: s,
-          alias: al,
-          regexStr: escapeRegExp(al).replace(/\s+/g, '\\s+'), // Chuyển khoảng trắng thành \s+ để bắt được khoảng trống bất kỳ
-          isFull: al === name, // Alias này có phải là họ tên đầy đủ của học sinh không
-        });
-      }
+      const key = normalizeName(s.name);
+      if (!key) continue;
+      if (!nameToStudents.has(key)) nameToStudents.set(key, []);
+      nameToStudents.get(key).push(s); // 2 em trùng y hệt họ tên thì cùng nhận lỗi
     }
 
-    // Loại các alias trùng giữa từ 2 học sinh trở lên (VD: 2 em cùng tên gọi "Nam",
-    // hoặc cùng họ "Nguyễn") để tránh gán nhầm lỗi cho tất cả các em trùng tên.
-    // Chỉ loại khi vẫn còn cách gõ rõ hơn được (tức có ít nhất 1 HS trùng alias mà alias
-    // đó không phải họ tên đầy đủ của em -> em đó có thể gõ đầy đủ để phân biệt).
-    // Nếu alias trùng chính là họ tên đầy đủ của TẤT CẢ các em liên quan (VD 2 em trùng
-    // y hệt họ tên), không còn cách nào rõ hơn nữa nên vẫn giữ alias -> lỗi sẽ được gán
-    // cho cả các em trùng tên, thay vì chặn hoàn toàn không gán được cho ai.
-    const aliasToStudents = new Map(); // alias -> Map(student -> isFull)
-    for (const { alias, student, isFull } of aliasMap) {
-      if (!aliasToStudents.has(alias)) aliasToStudents.set(alias, new Map());
-      const studentMap = aliasToStudents.get(alias);
-      studentMap.set(student, studentMap.get(student) || isFull);
-    }
-    const ambiguousAliases = new Set(
-      Array.from(aliasToStudents.entries())
-        .filter(([, students]) => students.size > 1 && Array.from(students.values()).some((f) => !f))
-        .map(([alias]) => alias)
-    );
-    aliasMap = aliasMap.filter(({ alias }) => !ambiguousAliases.has(alias));
+    // Các cụm tên đã gõ nhưng không khớp khít HS nào, để cảnh báo lại cho GV
+    const unknownNames = new Set();
 
-    // Ưu tiên khớp các cụm tên dài trước (như "Hà Anh" phải được ưu tiên hơn "Hà")
-    aliasMap.sort((a, b) => {
-      const aWords = a.alias.split(' ').length;
-      const bWords = b.alias.split(' ').length;
-      if (aWords !== bWords) return bWords - aWords;
-      return b.alias.length - a.alias.length;
-    });
-
-    // Dò tên trong một đoạn text theo kiểu "ăn dần" (consume): duyệt aliasMap đã sắp xếp
-    // dài-trước, mỗi khi khớp thì XÓA đúng đoạn text đó đi (thay bằng khoảng trắng) để các
-    // alias ngắn hơn không khớp lại vào phần chữ đã bị dùng.
-    // Đây là điểm mấu chốt: gõ "mai khanh" phải chỉ ra đúng em "... Mai Khanh", chứ không
-    // được đồng thời tính cho em tên "Mai" và em tên "Khanh".
-    // Dùng lookbehind/lookahead thay vì bắt ký tự bao quanh, để 2 tên viết liền nhau
-    // (VD: "mai, khanh") vẫn được dò hết chứ không bị nuốt mất dấu phân cách.
-    function collectStudents(text, targetSet) {
-      let remaining = text;
+    // Tách phần tên thành từng cụm theo dấu phân cách rồi tra khớp tuyệt đối từng cụm.
+    // reportUnknown: chỉ bật cho phần trước dấu ":" — cụm sau "+" có thể lẫn nội dung lỗi
+    // nên không đem ra cảnh báo.
+    function collectStudents(text, targetSet, reportUnknown) {
       let matchedAny = false;
-      for (const { student, regexStr } of aliasMap) {
-        if (!/\p{L}/u.test(remaining)) break; // Hết chữ để dò
-        const regex = new RegExp(`(?<!\\p{L})${regexStr}(?!\\p{L})`, 'giu');
-        let hit = false;
-        remaining = remaining.replace(regex, (m) => {
-          hit = true;
-          return ' '.repeat(m.length); // Giữ nguyên độ dài để không xô lệch vị trí
-        });
-        if (hit) {
-          targetSet.add(student);
+      for (const rawChunk of text.split(/[,;/&+]/)) {
+        const key = normalizeName(rawChunk);
+        if (!key) continue;
+        const found = nameToStudents.get(key);
+        if (found) {
+          for (const s of found) targetSet.add(s);
           matchedAny = true;
+        } else if (reportUnknown) {
+          unknownNames.add(rawChunk.trim());
         }
       }
       return matchedAny;
+    }
+
+    // Gợi ý khi gõ thiếu chữ: tìm HS có họ tên chứa nguyên cụm vừa gõ (theo ranh giới từ).
+    // Chỉ dùng để NHẮC lại cho GV, không dùng để gán lỗi — việc gán vẫn phải khớp khít.
+    const stripDiacritics = (str) =>
+      str.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+
+    function suggestFullNames(chunk) {
+      const key = normalizeName(chunk);
+      if (!key) return [];
+      const matchBy = (transform) => {
+        const regex = new RegExp(
+          `(?<!\\p{L})${escapeRegExp(transform(key)).replace(/\s+/g, '\\s+')}(?!\\p{L})`,
+          'iu'
+        );
+        return state.students.filter((s) => regex.test(transform(normalizeName(s.name))));
+      };
+      // Thử khớp nguyên văn trước; không ra thì thử bỏ dấu (GV gõ "mai khanh" không dấu)
+      let found = matchBy((v) => v);
+      if (found.length === 0) found = matchBy(stripDiacritics);
+      return found.map((s) => s.name);
     }
 
     // --- BƯỚC 2: Phân tích từng dòng ---
@@ -284,7 +260,7 @@
 
       if (namesPart.trim()) {
         // Dò tìm tất cả học sinh được nhắc đến trong phần bên trái dấu :
-        collectStudents(namesPart, matchedStudents);
+        collectStudents(namesPart, matchedStudents, true);
       }
 
       // Cú pháp "+Tên": nối thêm học sinh dùng chung lỗi ngay trong phần lỗi
@@ -299,7 +275,7 @@
       while ((plusMatch = plusNamePattern.exec(errorsPart)) !== null) {
         const chunk = plusMatch[1].trim();
         if (!chunk) continue;
-        const matchedAny = collectStudents(chunk, matchedStudents);
+        const matchedAny = collectStudents(chunk, matchedStudents, false);
         if (matchedAny) {
           plusMatchesToRemove.push([plusMatch.index, plusMatch[0].length]);
         }
@@ -407,22 +383,24 @@
     document.getElementById('nxhs-preview-target').textContent = `(Gồm ${parsedData.length} HS, Bắt đầu từ ô ${targetCell})`;
     
     let previewText = parsedData.map(d => `[${d.name}]\n${d.comment}`).join('\n\n');
-    if (notFoundLines && notFoundLines.length > 0) {
-      let warning = "⚠️ Không tìm thấy HS cho các dòng:\n" + notFoundLines.join("\n");
+    if ((notFoundLines && notFoundLines.length > 0) || unknownNames.size > 0) {
+      let warning = "";
+      if (notFoundLines.length > 0) {
+        warning = "⚠️ Không tìm thấy HS cho các dòng:\n" + notFoundLines.join("\n");
+      }
 
-      // Gợi ý cho các dòng bị bỏ qua vì tên gõ trùng với từ đã bị loại do nhiều HS chung tên
+      // Gợi ý cho các cụm tên gõ không khớp khít họ tên nào trên bảng
       const hints = new Set();
-      for (const line of notFoundLines) {
-        for (const alias of ambiguousAliases) {
-          const regex = new RegExp(`(^|[^\\p{L}])${escapeRegExp(alias).replace(/\s+/g, '\\s+')}([^\\p{L}]|$)`, 'igu');
-          if (regex.test(line)) {
-            const names = Array.from(aliasToStudents.get(alias).keys()).map(s => s.name).join(', ');
-            hints.add(`"${alias}" trùng giữa nhiều HS (${names}) — hãy gõ rõ hơn (VD: kèm họ/tên đệm)`);
-          }
+      for (const chunk of unknownNames) {
+        const suggestions = suggestFullNames(chunk);
+        if (suggestions.length > 0) {
+          hints.add(`"${chunk}" chưa đúng — hãy gõ đủ họ tên như trên bảng: ${suggestions.join(' / ')}`);
+        } else {
+          hints.add(`"${chunk}" không có trong danh sách lớp`);
         }
       }
       if (hints.size > 0) {
-        warning += "\n\n🔶 " + Array.from(hints).join("\n🔶 ");
+        warning += (warning ? "\n\n" : "") + "🔶 " + Array.from(hints).join("\n🔶 ");
       }
 
       previewText = warning + "\n\n" + previewText;
