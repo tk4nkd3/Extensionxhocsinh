@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Nhận Xét Học Sinh",
   "description": "AI tự động tạo nhận xét.",
-  "version": "2.0",
+  "version": "3.0",
   "permissions": [
     "storage",
     "activeTab"

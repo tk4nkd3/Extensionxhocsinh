@@ -231,7 +231,7 @@ Lê Khánh Vy : interested in phải có be +Đỗ Hoài Phong</div>
         </div>
       </div>
 
-      <div class="nxhs-footer">Nhận Xét Học Sinh v2</div>
+      <div class="nxhs-footer">Nhận Xét Học Sinh v3</div>
     `;
     document.body.appendChild(sidebar);
     bindEvents();
