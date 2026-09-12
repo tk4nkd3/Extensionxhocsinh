@@ -22,19 +22,25 @@ Một tiện ích mở rộng (Chrome Extension) tối ưu hóa thời gian dàn
 
 ## 🛠️ Hướng Dẫn Cài Đặt (Cho Đồng Nghiệp)
 
-Tiện ích này chạy cục bộ dưới dạng `Unpacked Extension`. Vui lòng làm theo các bước sau:
+Tiện ích này chạy cục bộ dưới dạng `Unpacked Extension`.
 
-1. Bấm vào nút xanh **Code** ở trang GitHub này ➡ Chọn **Download ZIP**.
-2. Giải nén file vừa tải về ra một thư mục cố định trên máy tính (VD: `D:\NhanXetHocSinh`).
+### ✅ Cách dễ nhất
+
+1. Vào trang **[Releases](https://github.com/tk4nkd3/Extensionxhocsinh/releases/latest)** ➡ tải file
+   `nhan-xet-hoc-sinh-v3.0.zip` ở mục **Assets**.
+2. Giải nén ra một thư mục cố định trên máy tính (VD: `D:\NhanXetHocSinh`).
 3. Mở trình duyệt Chrome, truy cập vào đường dẫn: `chrome://extensions/`
 4. Bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc phải trên cùng màn hình.
-5. Bấm vào nút **Load unpacked** (Tải tiện ích đã giải nén) ➡ Chọn thư mục **chứa trực tiếp file `manifest.json`**.
+5. Bấm vào nút **Load unpacked** (Tải tiện ích đã giải nén) ➡ Chọn thư mục vừa giải nén.
 6. Xong! Biểu tượng tiện ích đã sẵn sàng hoạt động.
 
-### ⚠️ Lỗi hay gặp nhất: chọn nhầm thư mục lồng nhau
+File ZIP trong Releases để các file **nằm thẳng ở gốc**, không có thư mục bọc, nên không dính lỗi ở dưới.
 
-File ZIP của GitHub đã có sẵn một thư mục bọc bên trong tên `Extensionxhocsinh-main`. Khi bấm
-**Extract All** của Windows, nó lại tạo thêm một thư mục cùng tên nữa ➡ thành **thư mục lồng thư mục**:
+### ⚠️ Nếu tải bằng nút *Code ➡ Download ZIP*
+
+Cách này cũng chạy được, nhưng ZIP của GitHub đã có sẵn một thư mục bọc bên trong tên
+`Extensionxhocsinh-main`. Khi bấm **Extract All** của Windows, nó lại tạo thêm một thư mục cùng tên
+nữa ➡ thành **thư mục lồng thư mục**:
 
 ```
 Downloads\
@@ -46,7 +52,7 @@ Downloads\
         └── icons\
 ```
 
-Chọn nhầm thư mục ngoài, Chrome sẽ báo **"Manifest file is missing or unreadable"** và tiện ích
+Lúc đó phải chọn thư mục **chứa trực tiếp `manifest.json`**. Chọn nhầm thư mục ngoài, Chrome sẽ báo **"Manifest file is missing or unreadable"** và tiện ích
 không chạy. Cứ mở thư mục ra, thấy file `manifest.json` nằm ngay trong đó thì mới đúng.
 
 ### 🔄 Cập nhật lên bản mới
