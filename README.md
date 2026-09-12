@@ -28,10 +28,32 @@ Tiện ích này chạy cục bộ dưới dạng `Unpacked Extension`. Vui lòn
 2. Giải nén file vừa tải về ra một thư mục cố định trên máy tính (VD: `D:\NhanXetHocSinh`).
 3. Mở trình duyệt Chrome, truy cập vào đường dẫn: `chrome://extensions/`
 4. Bật công tắc **Developer mode** (Chế độ dành cho nhà phát triển) ở góc phải trên cùng màn hình.
-5. Bấm vào nút **Load unpacked** (Tải tiện ích đã giải nén) ➡ Chọn đúng thư mục vừa giải nén ở bước 2.
+5. Bấm vào nút **Load unpacked** (Tải tiện ích đã giải nén) ➡ Chọn thư mục **chứa trực tiếp file `manifest.json`**.
 6. Xong! Biểu tượng tiện ích đã sẵn sàng hoạt động.
 
-> Mỗi lần cập nhật code mới, nhớ bấm **Reload** (⟳) ở thẻ tiện ích rồi **F5** lại trang Google Sheets.
+### ⚠️ Lỗi hay gặp nhất: chọn nhầm thư mục lồng nhau
+
+File ZIP của GitHub đã có sẵn một thư mục bọc bên trong tên `Extensionxhocsinh-main`. Khi bấm
+**Extract All** của Windows, nó lại tạo thêm một thư mục cùng tên nữa ➡ thành **thư mục lồng thư mục**:
+
+```
+Downloads\
+└── Extensionxhocsinh-main\        ← ❌ CHỌN Ở ĐÂY LÀ LỖI (không có manifest.json)
+    └── Extensionxhocsinh-main\    ← ✅ CHỌN THƯ MỤC NÀY
+        ├── manifest.json
+        ├── content.js
+        ├── sidebar.css
+        └── icons\
+```
+
+Chọn nhầm thư mục ngoài, Chrome sẽ báo **"Manifest file is missing or unreadable"** và tiện ích
+không chạy. Cứ mở thư mục ra, thấy file `manifest.json` nằm ngay trong đó thì mới đúng.
+
+### 🔄 Cập nhật lên bản mới
+
+Tiện ích cài dạng unpacked **không tự cập nhật**. Muốn lên bản mới: tải ZIP mới, giải nén đè lên
+thư mục cũ, rồi vào `chrome://extensions/` bấm **Reload** (⟳) ở thẻ tiện ích và **F5** lại trang
+Google Sheets. Xem chân thanh bên để biết đang chạy bản nào (`Nhận Xét Học Sinh v3`).
 
 ---
 
