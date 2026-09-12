@@ -70,91 +70,168 @@
     sidebar.id = 'nxhs-sidebar';
     sidebar.innerHTML = `
       <div class="nxhs-header">
-        <h2>⚡ Nhận Xét Nhanh</h2>
-        <div class="subtitle">Gõ tên HS + lỗi (cách nhau dấu phẩy)</div>
+        <div class="nxhs-brand">
+          <svg class="nxhs-bolt" viewBox="0 0 16 16" aria-hidden="true"><path d="M9 1.5 3.5 9h4L7 14.5 12.5 7h-4L9 1.5Z"/></svg>
+          <h2>Nhận Xét Nhanh</h2>
+          <button type="button" id="nxhs-config-toggle" title="Mở phần cấu hình cột tên và cột nhận xét">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h8M13 5h1M2 11h2M7 11h7"/><circle cx="11.5" cy="5" r="1.6"/><circle cx="5.5" cy="11" r="1.6"/></svg>
+            Cấu hình
+          </button>
+        </div>
+        <div class="nxhs-context">
+          <svg class="nxhs-ctx-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M6.5 6v7.5"/></svg>
+          <span id="nxhs-ctx-count">Đang tải…</span>
+          <i class="nxhs-ctx-sep"></i>
+          <span>Tên <strong id="nxhs-range-name">--</strong></span>
+          <svg class="nxhs-ctx-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 8h8M9 5l3 3-3 3"/></svg>
+          <span>Nhận xét <strong id="nxhs-range-comment">--</strong></span>
+        </div>
       </div>
+
       <div class="nxhs-body">
-        <div class="nxhs-cell-info" style="margin-bottom:12px;">
-          <span class="cell-icon">📍</span>
-          <span>Ô đang chọn: <strong class="cell-ref" id="nxhs-cell-ref">--</strong></span>
-        </div>
 
-        <div class="nxhs-range-box">
-          <div class="nxhs-range-head">
-            <label>📐 Vùng dữ liệu trên bảng</label>
-            <button id="nxhs-autodetect" title="Quét dòng tiêu đề của bảng để tự tìm cột tên và cột nhận xét">🔍 Tự nhận diện</button>
+        <section class="nxhs-step">
+          <div class="nxhs-step-head">
+            <span class="nxhs-step-num">1</span>
+            <span class="nxhs-step-title">Gõ nhận xét</span>
+            <label class="nxhs-colspan" title="Ô nhận xét gộp từ cột Q đến cột T thì nhập 4. Nếu không gộp thì để 1.">
+              <span>Số cột gộp</span>
+              <input type="number" id="nxhs-colspan" value="1" min="1" max="15">
+            </label>
           </div>
-          <div class="nxhs-range-row">
-            <span class="rg-label">Tên HS bắt đầu từ</span>
-            <strong class="rg-val" id="nxhs-range-name">--</strong>
-            <button class="rg-pick" id="nxhs-pick-name" title="Click vào ô chứa tên học sinh ĐẦU TIÊN trên bảng rồi bấm nút này">📌 Lấy ô đang chọn</button>
-          </div>
-          <div class="nxhs-range-row">
-            <span class="rg-label">Nhận xét bắt đầu từ</span>
-            <strong class="rg-val" id="nxhs-range-comment">--</strong>
-            <button class="rg-pick" id="nxhs-pick-comment" title="Click vào ô nhận xét của học sinh ĐẦU TIÊN rồi bấm nút này">📌 Lấy ô đang chọn</button>
-          </div>
-        </div>
 
-        <div class="nxhs-student-selector">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <label>📊 Dữ liệu học sinh:</label>
-            <button id="nxhs-reload-students" title="Tải lại danh sách">🔄 Làm mới</button>
-          </div>
-          <div id="nxhs-student-count" style="font-size:12px; color:#10b981; margin-top:4px; font-weight:600;">
-            Đang tải...
-          </div>
-        </div>
+          <textarea id="nxhs-fast-input" spellcheck="false" placeholder="Trần Văn Nam, Phạm Hà Anh : love + Ving chứ không phải to V; thiếu s ngôi thứ 3
+Lê Khánh Vy : interested in phải có be đằng trước +Đỗ Hoài Phong"></textarea>
 
-        <div class="nxhs-fast-input-wrap">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:-4px;">
-            <label for="nxhs-fast-input" style="font-size:12px; font-weight:600; color:#0f172a;">✏️ Nhập ghi chú tự do:</label>
-            <div style="display:flex; align-items:center; gap:6px;" title="Ví dụ: Ô nhận xét gộp từ cột Q đến cột T thì số cột là 4. Nếu không gộp thì để là 1.">
-              <span style="font-size:10px; color:#64748b;">Số cột gộp:</span>
-              <input type="number" id="nxhs-colspan" value="1" min="1" max="15" style="width:36px; height:20px; font-size:11px; text-align:center; border:1px solid #cbd5e1; border-radius:4px; outline:none; color:#0f172a;">
+          <div class="nxhs-syntax">
+            <span>Cú pháp <code>Họ tên đầy đủ : lỗi 1; lỗi 2</code></span>
+            <button type="button" id="nxhs-open-guide">Xem hướng dẫn</button>
+          </div>
+
+          <button id="nxhs-process-btn">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="2.5" width="9" height="11.5" rx="1.5"/><path d="M6 8.5h4M6 11h2.5"/></svg>
+            <span>Xử lý &amp; chép</span>
+            <kbd>Enter</kbd>
+          </button>
+
+          <div class="nxhs-status" id="nxhs-status"></div>
+        </section>
+
+        <section class="nxhs-step2" id="nxhs-step2">
+          <div class="nxhs-step2-idle">
+            <span class="nxhs-step-num muted">2</span>
+            <span>Dán vào bảng — hiện ra sau khi xử lý</span>
+          </div>
+
+          <div class="nxhs-result">
+            <div class="nxhs-result-head">
+              <span class="nxhs-result-check">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 8.5 3 3 6-7"/></svg>
+              </span>
+              <span class="nxhs-result-title" id="nxhs-result-title">Đã chép</span>
+              <span class="nxhs-result-range" id="nxhs-result-range"></span>
             </div>
+            <div class="nxhs-paste">
+              <div class="nxhs-paste-keys">Bấm <kbd>Ctrl</kbd><span>+</span><kbd>V</kbd> ngay trên bảng</div>
+              <div class="nxhs-paste-sub">Con trỏ đã nhảy sẵn tới ô <strong id="nxhs-result-cell">--</strong></div>
+            </div>
+            <div class="nxhs-overwrite" id="nxhs-result-warn"></div>
           </div>
-          <textarea id="nxhs-fast-input" spellcheck="false" placeholder="Nhập theo cú pháp Họ tên đầy đủ : Các lỗi (tên phải gõ y như trên bảng)\nVD:\nTrần Văn Nam, Phạm Hà Anh : love Ving to V; chia sai động từ\nLê Khánh Vy : interested in phải có be đằng trc +Đỗ Hoài Phong"></textarea>
-          <button id="nxhs-process-btn">📋 Xử Lý & Điền (Enter)</button>
+        </section>
+
+        <div id="nxhs-preview">
+          <div class="preview-label">Xem trước <span id="nxhs-preview-target"></span></div>
+          <div class="preview-text" id="nxhs-preview-text"></div>
         </div>
 
-        <div class="nxhs-instructions">
-          <details open>
-            <summary>📖 Hướng dẫn gõ tự do siêu tốc</summary>
-            <div class="inst-content">
-              <ul>
-                <li>Chưa biết đặt cột nào? Bấm <strong>🔍 Tự nhận diện</strong> ở khối <strong>📐 Vùng dữ liệu</strong> phía trên, hoặc click vào ô trên bảng rồi bấm <strong>📌 Lấy ô đang chọn</strong>.</li>
-                <li>Cú pháp chuẩn: <strong>Tên học sinh 1, Tên 2 : lỗi 1; lỗi 2</strong></li>
-                <li>Tiện ích sẽ tự động nhận diện tên học sinh ở bên trái dấu <strong>:</strong> và gắn các lỗi ở bên phải cho các em đó.</li>
-                <li>Nhớ ra thêm học sinh nào cũng mắc lỗi y hệt <strong>sau khi</strong> đã viết lỗi? Gõ thêm <strong>+Tên</strong> ngay trong phần lỗi (VD: <strong>+phong +hà hân</strong>), không cần quay lại sửa trước dấu :.</li>
-                <li>Nếu xuống dòng mà <strong>không có dấu :</strong>, hệ thống tự động cộng dồn lỗi cho học sinh ở dòng trên.</li>
-                <li>Nhấn <strong>Enter</strong> để tạo dữ liệu dán.</li>
-                <li>Ấn <strong>Ctrl + V</strong> ở màn hình Sheets để dán và giữ nguyên gộp ô.</li>
-              </ul>
-              <div class="inst-example">
-                VD:<br>
-                Nam, hà anh : love Ving to V; thiếu s<br>
-                Vy : interested in phải có be đằng trc +phong +hà hân<br>
-                Trí : sue số ít V thêm s
+        <div class="nxhs-sections">
+
+          <details class="nxhs-section" id="nxhs-config-section">
+            <summary>
+              <svg class="s-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 6h12M6.5 6v7.5"/></svg>
+              <span class="s-title">Cấu hình bảng</span>
+              <span class="s-meta" id="nxhs-config-meta"></span>
+              <svg class="s-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg>
+            </summary>
+            <div class="nxhs-section-body">
+              <button type="button" id="nxhs-autodetect">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg>
+                Tự nhận diện từ bảng
+              </button>
+              <p class="nxhs-hint nxhs-center">Quét dòng tiêu đề để tìm cột tên và cột nhận xét</p>
+
+              <div class="nxhs-rule"></div>
+
+              <div class="nxhs-field">
+                <label>Ô tên học sinh đầu tiên</label>
+                <div class="nxhs-field-row">
+                  <span class="nxhs-cellbox" id="nxhs-field-name">--</span>
+                  <span class="nxhs-field-meta" id="nxhs-student-count">Đang tải…</span>
+                  <button type="button" class="nxhs-pick" id="nxhs-pick-name" title="Click vào ô chứa tên học sinh ĐẦU TIÊN trên bảng rồi bấm nút này">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2"/><circle cx="8" cy="8" r="5.75"/><path d="M8 .75v2M8 13.25v2M.75 8h2M13.25 8h2"/></svg>
+                    Lấy ô <b class="nxhs-pick-ref">--</b>
+                  </button>
+                </div>
+              </div>
+
+              <div class="nxhs-field">
+                <label>Ô nhận xét đầu tiên</label>
+                <div class="nxhs-field-row">
+                  <span class="nxhs-cellbox" id="nxhs-field-comment">--</span>
+                  <span class="nxhs-field-meta">Áp dụng cho mọi học sinh</span>
+                  <button type="button" class="nxhs-pick" id="nxhs-pick-comment" title="Click vào ô nhận xét của học sinh ĐẦU TIÊN rồi bấm nút này">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2"/><circle cx="8" cy="8" r="5.75"/><path d="M8 .75v2M8 13.25v2M.75 8h2M13.25 8h2"/></svg>
+                    Lấy ô <b class="nxhs-pick-ref">--</b>
+                  </button>
+                </div>
+              </div>
+
+              <div class="nxhs-rule"></div>
+
+              <div class="nxhs-field-row nxhs-cellrow">
+                <span class="nxhs-hint">Ô đang chọn trên bảng <strong id="nxhs-cell-ref">--</strong></span>
+                <button type="button" id="nxhs-reload-students" title="Tải lại danh sách học sinh">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M14 8a6 6 0 1 1-1.9-4.4"/><path d="M14 2v4h-4"/></svg>
+                  Tải lại
+                </button>
               </div>
             </div>
           </details>
-        </div>
 
-        <div class="nxhs-status" id="nxhs-status"></div>
+          <details class="nxhs-section" id="nxhs-guide-section">
+            <summary>
+              <svg class="s-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h8a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z"/><path d="M5.5 6h5M5.5 9h3"/></svg>
+              <span class="s-title">Hướng dẫn cú pháp</span>
+              <svg class="s-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg>
+            </summary>
+            <div class="nxhs-section-body">
+              <ul class="nxhs-guide">
+                <li>Gõ <b>Họ tên đầy đủ</b> rồi dấu <b>:</b> rồi các lỗi. Tên phải gõ y như trên bảng.</li>
+                <li>Nhiều học sinh cùng lỗi: ngăn cách bằng dấu <b>,</b> trước dấu <b>:</b></li>
+                <li>Nhiều lỗi: ngăn cách bằng dấu <b>;</b></li>
+                <li>Nhớ ra thêm em nữa? Gõ <b>+Họ tên</b> ở <b>cuối dòng</b> lỗi.</li>
+                <li>Dòng tiếp theo <b>không có dấu :</b> sẽ cộng dồn lỗi cho các em ở dòng trên.</li>
+                <li><b>Enter</b> để xử lý, <b>Shift + Enter</b> để xuống dòng.</li>
+              </ul>
+              <div class="nxhs-guide-example">Trần Văn Nam, Phạm Hà Anh : love + Ving; thiếu s ngôi thứ 3
+Lê Khánh Vy : interested in phải có be +Đỗ Hoài Phong</div>
+            </div>
+          </details>
 
-        <div id="nxhs-preview">
-          <div class="preview-label">📋 Kết quả tạo ra: <span id="nxhs-preview-target" style="color:#6366f1;"></span></div>
-          <div class="preview-text" id="nxhs-preview-text"></div>
+          <details class="nxhs-section" id="nxhs-history-toggle">
+            <summary>
+              <svg class="s-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.75"/><path d="M8 4.75V8l2.25 1.5"/></svg>
+              <span class="s-title">Lịch sử</span>
+              <span class="s-count" id="nxhs-history-count"></span>
+              <svg class="s-chev" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4"/></svg>
+            </summary>
+            <div class="nxhs-section-body" id="nxhs-history-list"></div>
+          </details>
+
         </div>
-        
-        <div class="nxhs-history-header" id="nxhs-history-toggle">
-          <h3>🕓 Lịch sử <span id="nxhs-history-count"></span></h3>
-          <span class="toggle-arrow" id="nxhs-history-arrow">▼</span>
-        </div>
-        <div id="nxhs-history-list"></div>
       </div>
-      <div class="nxhs-footer">Nhận Xét Học Sinh v2 • Fast Input</div>
+
+      <div class="nxhs-footer">Nhận Xét Học Sinh v2</div>
     `;
     document.body.appendChild(sidebar);
     bindEvents();
@@ -195,12 +272,30 @@
       }
     });
 
-    historyToggle.addEventListener('click', () => {
-      state.historyOpen = !state.historyOpen;
-      document.getElementById('nxhs-history-list').classList.toggle('open', state.historyOpen);
-      document.getElementById('nxhs-history-arrow').classList.toggle('open', state.historyOpen);
+    // Lịch sử giờ là <details>: chỉ nạp nội dung khi giáo viên thực sự mở ra.
+    historyToggle.addEventListener('toggle', () => {
+      state.historyOpen = historyToggle.open;
       if (state.historyOpen) loadHistory();
     });
+
+    // Nút "Cấu hình" trên đầu và "Xem hướng dẫn" dưới ô nhập đều chỉ là lối tắt
+    // mở đúng mục gấp lại ở cuối thanh, rồi cuộn tới cho thấy.
+    const configBtn = document.getElementById('nxhs-config-toggle');
+    const guideBtn = document.getElementById('nxhs-open-guide');
+    if (configBtn) configBtn.addEventListener('click', () => openSection('nxhs-config-section'));
+    if (guideBtn) guideBtn.addEventListener('click', () => openSection('nxhs-guide-section'));
+
+    // Gõ lại nghĩa là nhóm nhận xét cũ đã dán xong -> thu Bước 2 về trạng thái chờ.
+    inputEl.addEventListener('input', () => {
+      if (inputEl.value.trim()) resetStep2();
+    });
+  }
+
+  function openSection(id, toggle) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.open = toggle ? !el.open : true;
+    if (el.open) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   /* ─── Nhận diện vùng dữ liệu: ô tên đầu tiên & ô nhận xét đầu tiên ──────
@@ -403,10 +498,67 @@
   }
 
   function updateRangeDisplay() {
-    const nameEl = document.getElementById('nxhs-range-name');
-    const commentEl = document.getElementById('nxhs-range-comment');
-    if (nameEl) nameEl.textContent = `${state.nameCol}${state.startRow}`;
-    if (commentEl) commentEl.textContent = `${state.commentCol}${state.startRow}`;
+    const nameRef = `${state.nameCol}${state.startRow}`;
+    const commentRef = `${state.commentCol}${state.startRow}`;
+    const set = (id, text) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    };
+    // Dòng tóm tắt trên header + hai ô trong mục "Cấu hình bảng" luôn khớp nhau.
+    set('nxhs-range-name', nameRef);
+    set('nxhs-range-comment', commentRef);
+    set('nxhs-field-name', nameRef);
+    set('nxhs-field-comment', commentRef);
+    set('nxhs-config-meta', `${nameRef} → ${commentRef}`);
+  }
+
+  /* ─── Bước 2: bảng nhắc dán ─────────────────────────────────────────
+   * Trước đây câu "bấm Ctrl+V" chỉ là thông báo tự tắt sau 4 giây. Giờ nó ở lại
+   * cho tới khi giáo viên gõ nhóm nhận xét tiếp theo.
+   */
+  function showResult({ count, targetCell, firstRow, lastRow, gapRows, gapsPreserved }) {
+    const step2 = document.getElementById('nxhs-step2');
+    if (!step2) return;
+
+    const set = (id, text) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = text;
+    };
+    set('nxhs-result-title', `Đã chép ${count} học sinh`);
+    set('nxhs-result-range', firstRow === lastRow
+      ? `${state.commentCol}${firstRow}`
+      : `${state.commentCol}${firstRow} : ${state.commentCol}${lastRow}`);
+    set('nxhs-result-cell', targetCell);
+
+    // Khối dán luôn liền mạch, nên các dòng xen giữa cũng bị ghi đè. Nói rõ cho giáo
+    // viên biết chúng được giữ nguyên hay đang có nguy cơ mất nội dung cũ.
+    const warnEl = document.getElementById('nxhs-result-warn');
+    if (warnEl) {
+      warnEl.classList.remove('visible', 'safe');
+      warnEl.textContent = '';
+      if (gapRows && gapRows.length) {
+        const shown = gapRows.slice(0, 6).map((r) => `${state.commentCol}${r}`).join(', ');
+        const more = gapRows.length > 6 ? ` và ${gapRows.length - 6} ô nữa` : '';
+        const icon = gapsPreserved
+          ? '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.75"/><path d="M8 7.5v3M8 5.25v.01"/></svg>'
+          : '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5 1.5 13.5h13L8 2.5Z"/><path d="M8 6.75v3M8 11.75v.01"/></svg>';
+        warnEl.innerHTML = icon + '<div></div>';
+        warnEl.lastElementChild.innerHTML = gapsPreserved
+          ? `${gapRows.length} dòng xen giữa (<strong>${escapeHtml(shown + more)}</strong>) được giữ nguyên nội dung cũ.`
+          : `${gapRows.length} dòng xen giữa (<strong>${escapeHtml(shown + more)}</strong>) sẽ bị dán đè ô trống ` +
+            'vì không đọc được nội dung cũ. Bấm <strong>Ctrl + Z</strong> nếu lỡ mất.';
+        warnEl.classList.add('visible');
+        if (gapsPreserved) warnEl.classList.add('safe');
+      }
+    }
+
+    step2.classList.add('done');
+    step2.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function resetStep2() {
+    const step2 = document.getElementById('nxhs-step2');
+    if (step2) step2.classList.remove('done');
   }
 
   async function processInput() {
@@ -603,6 +755,7 @@
     const manualColspan = parseInt(document.getElementById('nxhs-colspan').value) || 1;
     const clipboardRows = [];
     const htmlRows = [];
+    const gapRowNumbers = [];
 
     // Khối dán là một vùng LIỀN MẠCH từ dòng em đầu tiên tới em cuối cùng. Những
     // dòng xen giữa (em không được nhắc tên) vẫn bị dán đè, nên phải đọc lại nội
@@ -637,6 +790,7 @@
         htmlRows.push(`<tr><td colspan="${manualColspan}" style="vertical-align:top; border:none; white-space:normal;">${htmlC}</td></tr>`);
       } else {
         // Dòng xen giữa: ghi lại đúng nội dung đang có (nếu đọc được) để không xoá mất.
+        gapRowNumbers.push(r);
         const keep = readExisting ? readExisting(r) : '';
         let plainKeep = keep;
         if (plainKeep.includes('\n') || plainKeep.includes('"')) {
@@ -701,12 +855,19 @@
         'text/plain': blobText
       })
     ]).then(() => {
-      showStatus(`✅ Nhảy tới ${targetCell} & Copy ${parsedData.length} HS (Gộp ${manualColspan} cột). Bấm Ctrl+V!`, 'success');
+      showResult({
+        count: parsedData.length,
+        targetCell: targetCell,
+        firstRow: minRow,
+        lastRow: maxRow,
+        gapRows: gapRowNumbers,
+        gapsPreserved: !!readExisting,
+      });
       if (notFoundLines.length === 0) {
-        document.getElementById('nxhs-fast-input').value = ''; 
+        document.getElementById('nxhs-fast-input').value = '';
       }
     }).catch(() => {
-      showStatus(`⚠️ Đã nhảy tới ${targetCell}. Hãy bôi đen copy thủ công!`, 'error');
+      showStatus(`Đã nhảy tới ${targetCell} nhưng không ghi được vào bộ nhớ tạm. Hãy bôi đen và copy thủ công.`, 'error');
     });
 
     saveToHistory(text);
@@ -888,6 +1049,17 @@
   function updateStudentCount(msg) {
     const el = document.getElementById('nxhs-student-count');
     if (el) el.textContent = msg;
+
+    // Rút gọn lại cho dòng tóm tắt trên header: chỉ cần con số.
+    const ctx = document.getElementById('nxhs-ctx-count');
+    if (!ctx) return;
+    const found = /(\d+)\s*học sinh/.exec(msg);
+    const loading = msg.indexOf('Đang tải') === 0;
+    ctx.textContent = found ? `${found[1]} học sinh` : (loading ? 'Đang tải…' : 'Chưa có danh sách');
+    ctx.classList.toggle('nxhs-ctx-warn', !found && !loading);
+
+    // Đọc hỏng danh sách thì mở sẵn phần cấu hình, vì gần như luôn là sai cột/dòng.
+    if (!found && !loading) openSection('nxhs-config-section');
   }
 
   function getSheetId() {
@@ -956,8 +1128,15 @@
   function startCellWatcher() {
     setInterval(() => {
       const cellRef = getActiveCellRef();
+      if (!cellRef) return;
       const el = document.getElementById('nxhs-cell-ref');
-      if (el && cellRef) el.textContent = cellRef;
+      if (el) el.textContent = cellRef;
+      // Hai nút "Lấy ô ..." hiện luôn tên ô sẽ lấy, nên không còn hai nút giống hệt nhau.
+      const cell = parseCellRef(cellRef);
+      const label = cell ? `${cell.col}${cell.row}` : '--';
+      document.querySelectorAll('#nxhs-sidebar .nxhs-pick-ref').forEach((b) => {
+        b.textContent = label;
+      });
     }, 1000);
   }
 
