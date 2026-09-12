@@ -150,17 +150,35 @@
 /* ─── Body ───────────────────────────────────────────────────── */
 .nxhs-body {
   flex: 1;
+  /* min-height:0 là bắt buộc: không có nó, flex item lấy chiều cao tối thiểu bằng
+     nội dung nên phần thừa bị cắt mất thay vì sinh thanh cuộn. */
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  overscroll-behavior: contain;
 }
 
-.nxhs-body::-webkit-scrollbar { width: 5px; }
-.nxhs-body::-webkit-scrollbar-track { background: transparent; }
-.nxhs-body::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.3); border-radius: 10px; }
+/* Các khối con KHÔNG được co lại. Thân thanh bên là flex column cao cố định, nên
+   theo mặc định flex sẽ ép các khối con nhỏ lại cho vừa; khối nào có overflow:hidden
+   (như .nxhs-sections) thì bị ép rồi cắt luôn nội dung, và vì tổng chiều cao vẫn
+   "vừa khít" nên không bao giờ sinh thanh cuộn. Khoá co lại thì nội dung mới thật sự
+   tràn ra và cuộn được. */
+.nxhs-body > * { flex-shrink: 0; }
+
+/* Thanh cuộn để rõ và đủ rộng để kéo bằng chuột. */
+#nxhs-sidebar ::-webkit-scrollbar { width: 10px; }
+#nxhs-sidebar ::-webkit-scrollbar-track { background: transparent; }
+#nxhs-sidebar ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 10px;
+}
+#nxhs-sidebar ::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: content-box; }
 
 /* ─── Bước 1: gõ nhận xét ────────────────────────────────────── */
 .nxhs-step {

@@ -289,13 +289,63 @@ Lê Khánh Vy : interested in phải có be +Đỗ Hoài Phong</div>
     inputEl.addEventListener('input', () => {
       if (inputEl.value.trim()) resetStep2();
     });
+
+    // Mở một mục dài ra thì kéo nó lên đầu tầm nhìn, khỏi phải mò cuộn.
+    document.querySelectorAll('#nxhs-sidebar .nxhs-section').forEach((sec) => {
+      sec.addEventListener('toggle', () => {
+        if (sec.open) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    enableWheelScroll();
   }
 
-  function openSection(id, toggle) {
+  function openSection(id) {
     const el = document.getElementById(id);
     if (!el) return;
-    el.open = toggle ? !el.open : true;
-    if (el.open) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (el.open) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      el.open = true; // sự kiện 'toggle' ở trên sẽ tự cuộn tới
+    }
+  }
+
+  /* Google Sheets nghe sự kiện lăn chuột ở mức trang để cuộn lưới bảng và chặn luôn
+   * hành vi mặc định, nên bánh xe không cuộn được thanh bên -> phần Hướng dẫn và
+   * Cấu hình dài hơn màn hình thì không đọc hết được. Vậy nên tự cuộn lấy: tìm khung
+   * cuộn được gần nhất dưới con trỏ (ô nhập, danh sách lịch sử, hay cả thân thanh bên)
+   * rồi đẩy scrollTop, đồng thời chặn không cho sự kiện lan ra ngoài. */
+  function enableWheelScroll() {
+    const sidebar = document.getElementById('nxhs-sidebar');
+    if (!sidebar) return;
+    const stop = sidebar.parentElement;
+
+    function canScroll(el, delta) {
+      if (!el || el === stop || !(el instanceof Element)) return false;
+      if (el.scrollHeight - el.clientHeight <= 1) return false;
+      const overflowY = getComputedStyle(el).overflowY;
+      if (overflowY !== 'auto' && overflowY !== 'scroll' && el.tagName !== 'TEXTAREA') return false;
+      return delta < 0
+        ? el.scrollTop > 0
+        : el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+    }
+
+    sidebar.addEventListener('wheel', (e) => {
+      if (e.ctrlKey) return; // Ctrl + lăn là phóng to/thu nhỏ của trình duyệt, để yên.
+
+      // deltaMode 1 = theo dòng, 2 = theo trang; quy hết về pixel.
+      let delta = e.deltaY;
+      if (e.deltaMode === 1) delta *= 16;
+      else if (e.deltaMode === 2) delta *= sidebar.clientHeight;
+
+      let el = e.target instanceof Element ? e.target : sidebar;
+      while (el && el !== stop && !canScroll(el, delta)) el = el.parentElement;
+      if (el && el !== stop) el.scrollTop += delta;
+
+      // Cuộn được hay không cũng không để lưới bảng phía sau chạy theo.
+      e.preventDefault();
+      e.stopPropagation();
+    }, { passive: false });
   }
 
   /* ─── Nhận diện vùng dữ liệu: ô tên đầu tiên & ô nhận xét đầu tiên ──────
