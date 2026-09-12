@@ -9,7 +9,10 @@
     nameCol: 'A',
     commentCol: 'Q',
     startRow: 2,
+    colspan: 1,
     students: [],
+    sheetRows: null,      // toàn bộ dòng của tab hiện tại (kể cả dòng đang ẩn)
+    rowsReliable: true,   // false khi phải dùng gviz dự phòng (có thể lệch dòng)
     lastComment: '',
     isOpen: false,
     historyOpen: false,
@@ -20,6 +23,7 @@
   function init() {
     loadSettings().then(() => {
       injectSidebar();
+      applySettingsToUI();
       injectToggle();
       loadStudents();
       startCellWatcher();
@@ -34,11 +38,18 @@
         if (data.nameCol) state.nameCol = data.nameCol.toUpperCase();
         if (data.commentCol) state.commentCol = data.commentCol.toUpperCase();
         if (data.startRow) state.startRow = parseInt(data.startRow, 10);
-        const colInput = document.getElementById('nxhs-colspan');
-        if (colInput && data.colspan) colInput.value = data.colspan;
+        if (data.colspan) state.colspan = parseInt(data.colspan, 10) || 1;
         resolve();
       });
     });
+  }
+
+  // Đổ cài đặt đã lưu ra giao diện. Phải gọi SAU injectSidebar() vì lúc loadSettings()
+  // chạy thì sidebar chưa tồn tại (trước đây số cột gộp vì thế không được nhớ lại).
+  function applySettingsToUI() {
+    const colInput = document.getElementById('nxhs-colspan');
+    if (colInput) colInput.value = state.colspan;
+    updateRangeDisplay();
   }
 
   function listenForSettingsUpdates() {
@@ -47,6 +58,7 @@
         if (msg.nameCol) state.nameCol = msg.nameCol.toUpperCase();
         if (msg.commentCol) state.commentCol = msg.commentCol.toUpperCase();
         if (msg.startRow) state.startRow = parseInt(msg.startRow, 10);
+        updateRangeDisplay();
         loadStudents();
         showStatus('Cài đặt đã cập nhật!', 'success');
       }
@@ -65,6 +77,23 @@
         <div class="nxhs-cell-info" style="margin-bottom:12px;">
           <span class="cell-icon">📍</span>
           <span>Ô đang chọn: <strong class="cell-ref" id="nxhs-cell-ref">--</strong></span>
+        </div>
+
+        <div class="nxhs-range-box">
+          <div class="nxhs-range-head">
+            <label>📐 Vùng dữ liệu trên bảng</label>
+            <button id="nxhs-autodetect" title="Quét dòng tiêu đề của bảng để tự tìm cột tên và cột nhận xét">🔍 Tự nhận diện</button>
+          </div>
+          <div class="nxhs-range-row">
+            <span class="rg-label">Tên HS bắt đầu từ</span>
+            <strong class="rg-val" id="nxhs-range-name">--</strong>
+            <button class="rg-pick" id="nxhs-pick-name" title="Click vào ô chứa tên học sinh ĐẦU TIÊN trên bảng rồi bấm nút này">📌 Lấy ô đang chọn</button>
+          </div>
+          <div class="nxhs-range-row">
+            <span class="rg-label">Nhận xét bắt đầu từ</span>
+            <strong class="rg-val" id="nxhs-range-comment">--</strong>
+            <button class="rg-pick" id="nxhs-pick-comment" title="Click vào ô nhận xét của học sinh ĐẦU TIÊN rồi bấm nút này">📌 Lấy ô đang chọn</button>
+          </div>
         </div>
 
         <div class="nxhs-student-selector">
@@ -94,6 +123,7 @@
             <summary>📖 Hướng dẫn gõ tự do siêu tốc</summary>
             <div class="inst-content">
               <ul>
+                <li>Chưa biết đặt cột nào? Bấm <strong>🔍 Tự nhận diện</strong> ở khối <strong>📐 Vùng dữ liệu</strong> phía trên, hoặc click vào ô trên bảng rồi bấm <strong>📌 Lấy ô đang chọn</strong>.</li>
                 <li>Cú pháp chuẩn: <strong>Tên học sinh 1, Tên 2 : lỗi 1; lỗi 2</strong></li>
                 <li>Tiện ích sẽ tự động nhận diện tên học sinh ở bên trái dấu <strong>:</strong> và gắn các lỗi ở bên phải cho các em đó.</li>
                 <li>Nhớ ra thêm học sinh nào cũng mắc lỗi y hệt <strong>sau khi</strong> đã viết lỗi? Gõ thêm <strong>+Tên</strong> ngay trong phần lỗi (VD: <strong>+phong +hà hân</strong>), không cần quay lại sửa trước dấu :.</li>
@@ -139,7 +169,8 @@
 
     if (colInput) {
       colInput.addEventListener('change', (e) => {
-        chrome.storage.local.set({ colspan: e.target.value });
+        state.colspan = parseInt(e.target.value, 10) || 1;
+        chrome.storage.local.set({ colspan: state.colspan });
       });
     }
 
@@ -147,6 +178,13 @@
       loadStudents();
       showStatus('Đang tải lại danh sách...', 'info');
     });
+
+    const pickNameBtn = document.getElementById('nxhs-pick-name');
+    const pickCommentBtn = document.getElementById('nxhs-pick-comment');
+    const autoDetectBtn = document.getElementById('nxhs-autodetect');
+    if (pickNameBtn) pickNameBtn.addEventListener('click', () => pickCellAs('name'));
+    if (pickCommentBtn) pickCommentBtn.addEventListener('click', () => pickCellAs('comment'));
+    if (autoDetectBtn) autoDetectBtn.addEventListener('click', autoDetectRange);
 
     processBtn.addEventListener('click', processInput);
     
@@ -165,9 +203,219 @@
     });
   }
 
-  function processInput() {
+  /* ─── Nhận diện vùng dữ liệu: ô tên đầu tiên & ô nhận xét đầu tiên ──────
+   * Hai cách:
+   *  1. "🔍 Tự nhận diện" – quét vài chục dòng đầu của bảng, dò tiêu đề kiểu
+   *     "Họ và tên" / "Nhận xét" để suy ra cột tên, cột nhận xét và dòng bắt đầu.
+   *  2. "📌 Lấy ô đang chọn" – lấy thẳng ô giáo viên đang click trên bảng.
+   * Cả hai đều ghi vào cùng 3 cài đặt cũ (nameCol / commentCol / startRow) nên
+   * popup và phần xử lý phía dưới không phải đổi gì.
+   */
+
+  // Name Box có thể hiện "Q2", "Q2:T2" hoặc "Sheet1!Q2" -> luôn lấy ô đầu tiên.
+  function parseCellRef(ref) {
+    if (!ref) return null;
+    const first = String(ref).split(':')[0].split('!').pop().replace(/\$/g, '').trim();
+    const m = first.match(/^([A-Za-z]{1,3})(\d+)$/);
+    if (!m) return null;
+    return { col: m[1].toUpperCase(), row: parseInt(m[2], 10) };
+  }
+
+  // 0 -> A, 25 -> Z, 26 -> AA (chỉ dùng khi gviz không trả về tên cột)
+  function indexToCol(idx) {
+    let s = '';
+    let n = idx + 1;
+    while (n > 0) {
+      const r = (n - 1) % 26;
+      s = String.fromCharCode(65 + r) + s;
+      n = Math.floor((n - 1) / 26);
+    }
+    return s;
+  }
+
+  // Bỏ dấu + viết thường để so tiêu đề ("Họ và tên" -> "ho va ten")
+  function normalizeHeader(text) {
+    return String(text)
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/đ/gi, 'd')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Xếp theo độ ưu tiên: cụm càng cụ thể càng đứng trước.
+  const HEADER_NAME_KEYS = [
+    'ho va ten', 'ho ten', 'hovaten', 'ten hoc sinh', 'ten hs',
+    'student name', 'full name', 'fullname',
+    'hoc sinh', 'student', 'ten',
+  ];
+  const HEADER_COMMENT_KEYS = [
+    'nhan xet', 'loi phe', 'danh gia', 'ghi chu',
+    'comment', 'remark', 'feedback', 'note',
+  ];
+
+  function headerScore(normalizedText, keys) {
+    for (let i = 0; i < keys.length; i++) {
+      if (normalizedText.includes(keys[i])) return i;
+    }
+    return -1;
+  }
+
+  async function fetchGviz(sheetId, gid, query) {
+    try {
+      const gidParam = gid ? `&gid=${gid}` : '';
+      const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0&${query}${gidParam}`;
+      const res = await fetch(url, { credentials: 'include' });
+      const text = await res.text();
+      if (!res.ok || text.includes('<!DOCTYPE html>')) return null;
+      const json = JSON.parse(text.replace(/^[^{]*/, '').replace(/[^}]*$/, ''));
+      if (json.status === 'error') return null;
+      return json;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function autoDetectRange() {
+    const sheetId = getSheetId();
+    if (!sheetId) {
+      showStatus('Không đọc được ID bảng tính.', 'error');
+      return;
+    }
+    showStatus('🔍 Đang quét bảng tính...', 'info');
+    const gid = getSheetGid();
+
+    // Ưu tiên dạng "range=" vì khi đó chỉ số dòng trả về khớp đúng dòng thật trên
+    // bảng (dòng đầu tiên = dòng 1). Dạng "select *" chỉ dùng khi range bị từ chối.
+    let json = await fetchGviz(sheetId, gid, 'range=A1:BZ40');
+    if (!json) json = await fetchGviz(sheetId, gid, 'range=A1:Z40');
+    if (!json) json = await fetchGviz(sheetId, gid, 'tq=' + encodeURIComponent('select * limit 40'));
+
+    const rows = (json && json.table && json.table.rows) || [];
+    if (!rows.length) {
+      showStatus('Không quét được bảng. Kiểm tra sheet đã chia sẻ "Bất kỳ ai có liên kết" chưa.', 'error');
+      return;
+    }
+
+    const cols = (json.table && json.table.cols) || [];
+    const letterOf = (i) => (cols[i] && cols[i].id) ? cols[i].id : indexToCol(i);
+
+    let bestName = null;
+    let bestComment = null;
+    for (let r = 0; r < rows.length; r++) {
+      const cells = (rows[r] && rows[r].c) || [];
+      for (let c = 0; c < cells.length; c++) {
+        const raw = cells[c] && cells[c].v;
+        if (raw === null || raw === undefined) continue;
+        const text = normalizeHeader(raw);
+        if (!text) continue;
+
+        const ns = headerScore(text, HEADER_NAME_KEYS);
+        if (ns >= 0 && (!bestName || ns < bestName.score)) {
+          bestName = { score: ns, row: r, col: c, raw: String(raw).trim() };
+        }
+        const cs = headerScore(text, HEADER_COMMENT_KEYS);
+        if (cs >= 0 && (!bestComment || cs < bestComment.score)) {
+          bestComment = { score: cs, row: r, col: c, raw: String(raw).trim() };
+        }
+      }
+    }
+
+    if (!bestName) {
+      showStatus('Không thấy tiêu đề cột tên học sinh. Hãy dùng nút 📌 để chỉ định thủ công.', 'error');
+      return;
+    }
+
+    // Dòng bắt đầu = ô có chữ đầu tiên nằm DƯỚI ô tiêu đề (bỏ qua dòng trống xen giữa).
+    let startRow = bestName.row + 2; // mặc định: ngay dưới tiêu đề (chỉ số 0 = dòng 1)
+    for (let r = bestName.row + 1; r < rows.length; r++) {
+      const cell = rows[r] && rows[r].c && rows[r].c[bestName.col];
+      const v = cell && cell.v;
+      if (v !== null && v !== undefined && String(v).trim()) {
+        startRow = r + 1;
+        break;
+      }
+    }
+
+    const patch = { nameCol: letterOf(bestName.col), startRow };
+    if (bestComment) patch.commentCol = letterOf(bestComment.col);
+    applyRangeSettings(patch);
+
+    let msg = `✅ Tên HS: ${patch.nameCol}${startRow} ("${bestName.raw}")`;
+    if (bestComment) {
+      showStatus(`${msg} • Nhận xét: ${patch.commentCol}${startRow} ("${bestComment.raw}")`, 'success');
+    } else {
+      showStatus(`${msg} • ⚠️ Chưa thấy cột nhận xét, hãy dùng nút 📌.`, 'error');
+    }
+  }
+
+  function pickCellAs(kind) {
+    const cell = parseCellRef(getActiveCellRef());
+    if (!cell) {
+      showStatus('Chưa đọc được ô đang chọn. Click vào một ô trên bảng rồi bấm lại.', 'error');
+      return;
+    }
+
+    if (kind === 'name') {
+      applyRangeSettings({ nameCol: cell.col, startRow: cell.row });
+      showStatus(`✅ Tên HS bắt đầu từ ô ${cell.col}${cell.row}.`, 'success');
+      return;
+    }
+
+    const rowMismatch = cell.row !== state.startRow;
+    applyRangeSettings({ commentCol: cell.col });
+    if (rowMismatch) {
+      showStatus(
+        `⚠️ Đã lấy cột nhận xét ${cell.col}, nhưng ô này ở dòng ${cell.row} còn danh sách HS bắt đầu ở dòng ${state.startRow}. Kiểm tra lại ô tên.`,
+        'error'
+      );
+    } else {
+      showStatus(`✅ Nhận xét bắt đầu từ ô ${cell.col}${cell.row}.`, 'success');
+    }
+  }
+
+  function applyRangeSettings(patch) {
+    const reloadNeeded = !!(patch.nameCol || patch.startRow);
+    if (patch.nameCol) state.nameCol = patch.nameCol.toUpperCase();
+    if (patch.commentCol) state.commentCol = patch.commentCol.toUpperCase();
+    if (patch.startRow) state.startRow = parseInt(patch.startRow, 10);
+
+    chrome.storage.local.set({
+      nameCol: state.nameCol,
+      commentCol: state.commentCol,
+      startRow: state.startRow,
+    });
+
+    // Đẩy sang các tab Sheets khác đang mở (background bỏ qua chính tab này).
+    try {
+      const sent = chrome.runtime.sendMessage({
+        action: 'settingsUpdated',
+        nameCol: state.nameCol,
+        commentCol: state.commentCol,
+        startRow: state.startRow,
+      });
+      if (sent && typeof sent.catch === 'function') sent.catch(() => {});
+    } catch (e) {}
+
+    updateRangeDisplay();
+    if (reloadNeeded) loadStudents();
+  }
+
+  function updateRangeDisplay() {
+    const nameEl = document.getElementById('nxhs-range-name');
+    const commentEl = document.getElementById('nxhs-range-comment');
+    if (nameEl) nameEl.textContent = `${state.nameCol}${state.startRow}`;
+    if (commentEl) commentEl.textContent = `${state.commentCol}${state.startRow}`;
+  }
+
+  async function processInput() {
     const text = document.getElementById('nxhs-fast-input').value;
     if (!text.trim()) return;
+
+    // Bắt đầu đọc lại bảng NGAY từ đầu để lát nữa còn giữ nguyên nhận xét cũ của
+    // những em nằm xen giữa mà lần nhập này không nhắc tới (xem Bước 6).
+    const freshRowsPromise = fetchSheetRows();
 
     if (state.students.length === 0) {
       showStatus('Chưa có dữ liệu học sinh! Hãy Làm mới.', 'error');
@@ -327,8 +575,10 @@
 
     // --- Bước 4: Cấu trúc dữ liệu và lấy minRow ---
     const parsedData = Array.from(studentErrorsMap.values()).map(data => {
-      let comment = "Con chú ý:\n";
-      comment += Array.from(data.errors).map(e => "- " + e.charAt(0).toUpperCase() + e.slice(1)).join('\n');
+      // Chỉ gồm các dòng lỗi, không còn câu mở đầu "Con chú ý:".
+      const comment = Array.from(data.errors)
+        .map(e => "- " + e.charAt(0).toUpperCase() + e.slice(1))
+        .join('\n');
       return { row: data.student.row, name: data.student.name, comment: comment };
     });
 
@@ -340,13 +590,12 @@
     const targetCell = `${state.commentCol}${minRow}`;
     navigateToCell(targetCell);
 
-    // --- Bước 6: Lấy Font chữ hiện tại từ thanh công cụ của Google Sheets ---
-    let fontFamily = 'Arial';
+    // --- Bước 6: Font chữ cho phần dán ---
+    // Font chữ cố định Times New Roman (không lấy theo thanh công cụ nữa).
+    // Cỡ chữ vẫn quét từ thanh công cụ Sheets để khớp với phần còn lại của bảng.
+    const fontFamily = 'Times New Roman';
     let fontSize = '10pt';
     try {
-      const fontEl = document.querySelector('.docs-fontmenu-font');
-      if (fontEl && fontEl.textContent) fontFamily = fontEl.textContent.trim();
-      
       const sizeEl = document.querySelector('#docs-fontsize-input-box') || document.querySelector('.goog-toolbar-text-input') || document.querySelector('input[aria-label="Cỡ chữ"]') || document.querySelector('input[aria-label="Font size"]');
       if (sizeEl && sizeEl.value) fontSize = sizeEl.value.trim() + 'pt';
     } catch(e) {}
@@ -354,6 +603,22 @@
     const manualColspan = parseInt(document.getElementById('nxhs-colspan').value) || 1;
     const clipboardRows = [];
     const htmlRows = [];
+
+    // Khối dán là một vùng LIỀN MẠCH từ dòng em đầu tiên tới em cuối cùng. Những
+    // dòng xen giữa (em không được nhắc tên) vẫn bị dán đè, nên phải đọc lại nội
+    // dung đang có để ghi lại y nguyên -> không xoá mất nhận xét cũ của các em đó.
+    const gapRows = (maxRow - minRow + 1) - parsedData.length;
+    const commentIdx = colToIndex(state.commentCol);
+    let readExisting = null;
+    if (gapRows > 0) {
+      // Chỉ cần chờ đọc bảng khi thực sự có dòng xen giữa (nhập 1 em hoặc các em
+      // liền nhau thì không phải chờ gì thêm).
+      const freshRows = await freshRowsPromise;
+      if (freshRows) {
+        state.sheetRows = freshRows;
+        readExisting = (r) => ((freshRows[r - 1] && freshRows[r - 1][commentIdx]) || '').toString();
+      }
+    }
 
     let htmlContent = `<table xmlns="http://www.w3.org/1999/xhtml" cellspacing="0" cellpadding="0" dir="ltr" style="border-collapse:collapse;border:none;font-family:${fontFamily};font-size:${fontSize};">`;
 
@@ -371,8 +636,15 @@
         let htmlC = c.replace(/\n/g, '<br>');
         htmlRows.push(`<tr><td colspan="${manualColspan}" style="vertical-align:top; border:none; white-space:normal;">${htmlC}</td></tr>`);
       } else {
-        clipboardRows.push("");
-        htmlRows.push(`<tr><td colspan="${manualColspan}" style="border:none;"></td></tr>`);
+        // Dòng xen giữa: ghi lại đúng nội dung đang có (nếu đọc được) để không xoá mất.
+        const keep = readExisting ? readExisting(r) : '';
+        let plainKeep = keep;
+        if (plainKeep.includes('\n') || plainKeep.includes('"')) {
+          plainKeep = `"${plainKeep.replace(/"/g, '""')}"`;
+        }
+        clipboardRows.push(plainKeep);
+        const htmlKeep = escapeHtml(keep).replace(/\n/g, '<br>');
+        htmlRows.push(`<tr><td colspan="${manualColspan}" style="vertical-align:top; border:none; white-space:normal;">${htmlKeep}</td></tr>`);
       }
     }
 
@@ -383,6 +655,18 @@
     document.getElementById('nxhs-preview-target').textContent = `(Gồm ${parsedData.length} HS, Bắt đầu từ ô ${targetCell})`;
     
     let previewText = parsedData.map(d => `[${d.name}]\n${d.comment}`).join('\n\n');
+
+    const riskWarnings = [];
+    if (!state.rowsReliable) {
+      riskWarnings.push('⚠️ Đang đọc danh sách ở chế độ dự phòng. Nếu bảng có dòng đang ẩn, vị trí dán có thể lệch dòng — hãy bỏ ẩn dòng rồi bấm 🔄 Làm mới.');
+    }
+    if (gapRows > 0 && !readExisting) {
+      riskWarnings.push(`⚠️ Không đọc được nội dung cũ: ${gapRows} dòng nằm xen giữa sẽ BỊ XOÁ nhận xét khi dán. Hãy nhập lần lượt từng em cho an toàn.`);
+    }
+    if (riskWarnings.length > 0) {
+      previewText = riskWarnings.join('\n') + '\n\n' + previewText;
+    }
+
     if ((notFoundLines && notFoundLines.length > 0) || unknownNames.size > 0) {
       let warning = "";
       if (notFoundLines.length > 0) {
@@ -443,16 +727,118 @@
     document.getElementById('nxhs-toggle').classList.toggle('open', state.isOpen);
   }
 
+  // 0 dựa trên chữ cái cột: A -> 0, Q -> 16, AA -> 26
+  function colToIndex(col) {
+    const s = String(col || 'A').toUpperCase();
+    let n = 0;
+    for (let i = 0; i < s.length; i++) {
+      const code = s.charCodeAt(i) - 64;
+      if (code < 1 || code > 26) return 0;
+      n = n * 26 + code;
+    }
+    return n - 1;
+  }
+
+  function parseCsv(text) {
+    const rows = [];
+    let row = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') { cur += '"'; i++; }
+          else inQuotes = false;
+        } else cur += ch;
+      } else if (ch === '"') inQuotes = true;
+      else if (ch === ',') { row.push(cur); cur = ''; }
+      else if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+      else if (ch !== '\r') cur += ch;
+    }
+    if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
+
+  function httpGetText(url) {
+    return new Promise((resolve) => {
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        // KHÔNG bật withCredentials: /export chuyển hướng sang googleusercontent.com,
+        // bật cờ này sẽ làm request bị CORS chặn (status 0). Cookie đăng nhập vẫn
+        // được gửi kèm vì đây là request cùng origin với trang Sheets.
+        xhr.onload = () => resolve(xhr.status === 200 ? xhr.responseText : null);
+        xhr.onerror = () => resolve(null);
+        xhr.send();
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  }
+
+  /* Đọc TOÀN BỘ tab đang mở bằng bản xuất CSV. rows[i] ứng với dòng (i + 1).
+   *
+   * Vì sao không dùng /gviz/tq nữa: gviz BỎ QUA các dòng đang bị ẩn. Danh sách
+   * trả về vì thế ngắn hơn bảng thật, và cách tính "dòng = dòng bắt đầu + thứ tự
+   * trong mảng" làm mọi học sinh nằm dưới dòng ẩn bị lệch lên đúng số dòng đã ẩn
+   * (lớp 31 em, ẩn 1 dòng -> chỉ thấy 30 em, nhận xét của em thứ 15 trở đi rơi
+   * vào ô của em ngay phía trên). Bản xuất CSV giữ nguyên cả dòng ẩn nên số dòng
+   * luôn khớp với bảng.
+   */
+  async function fetchSheetRows() {
+    const sheetId = getSheetId();
+    if (!sheetId) return null;
+    const gid = getSheetGid();
+    // Giữ nguyên tiền tố /u/<n>/ của tài khoản đang đăng nhập (nếu có).
+    let base = location.origin + location.pathname.replace(/\/(edit|view|preview|htmlview)(\/.*)?$/, '');
+    if (!/\/spreadsheets\/(u\/\d+\/)?d\/[^/]+$/.test(base)) {
+      base = `https://docs.google.com/spreadsheets/d/${sheetId}`;
+    }
+    const text = await httpGetText(`${base}/export?format=csv${gid ? `&gid=${gid}` : ''}`);
+    if (!text || text.slice(0, 300).indexOf('<!DOCTYPE html') !== -1) return null;
+    return parseCsv(text);
+  }
+
   async function loadStudents() {
     const sheetId = getSheetId();
     if (!sheetId) return;
-    
+
+    const col = state.nameCol;
+    const row = state.startRow;
+
+    updateStudentCount('Đang tải...');
+
+    // Ưu tiên bản xuất CSV: số dòng đọc được khớp đúng với bảng (kể cả dòng ẩn).
+    const csvRows = await fetchSheetRows();
+    if (csvRows) {
+      const idx = colToIndex(col);
+      const students = [];
+      for (let i = row - 1; i < csvRows.length; i++) {
+        const name = ((csvRows[i] && csvRows[i][idx]) || '').toString().trim();
+        if (name) students.push({ name, row: i + 1 });
+      }
+      state.sheetRows = csvRows;
+      state.rowsReliable = true;
+      state.students = students;
+      updateStudentCount(`✅ Đã nhận diện ${students.length} học sinh (Cột ${col})`);
+      return;
+    }
+
+    // Dự phòng khi không tải được CSV. CẢNH BÁO: gviz bỏ qua dòng ẩn -> có thể lệch dòng.
+    state.sheetRows = null;
+    state.rowsReliable = false;
+    await loadStudentsViaGviz();
+  }
+
+  async function loadStudentsViaGviz() {
+    const sheetId = getSheetId();
+    if (!sheetId) return;
+
     const gid = getSheetGid();
     const col = state.nameCol;
     const row = state.startRow;
-    
-    updateStudentCount('Đang tải...');
-    
+
     try {
       const gidParam = gid ? `&gid=${gid}` : '';
       const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0&range=${col}${row}:${col}1000${gidParam}`;
@@ -489,7 +875,10 @@
         })
         .filter((s) => s.name.length > 0);
 
-      updateStudentCount(`✅ Đã nhận diện ${state.students.length} học sinh (Cột ${col})`);
+      updateStudentCount(
+        `⚠️ Đã nhận diện ${state.students.length} học sinh (Cột ${col}) — chế độ dự phòng, ` +
+        `nếu bảng đang ẩn dòng thì vị trí dán có thể bị lệch.`
+      );
     } catch (err) {
       state.students = [];
       updateStudentCount(`Lỗi: ${err.message}`);

@@ -709,3 +709,89 @@
   #nxhs-sidebar.open { right: 0; }
   #nxhs-toggle.open { display: none; }
 }
+
+/* ─── Vùng dữ liệu (nhận diện ô bắt đầu) ───────────────────────── */
+#nxhs-sidebar .nxhs-range-box {
+  background: rgba(99, 102, 241, 0.07);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+#nxhs-sidebar .nxhs-range-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#nxhs-sidebar .nxhs-range-head label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6366f1;
+}
+
+#nxhs-sidebar #nxhs-autodetect {
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 5px 9px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+#nxhs-sidebar #nxhs-autodetect:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 3px 10px rgba(99, 102, 241, 0.3);
+}
+
+#nxhs-sidebar .nxhs-range-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+#nxhs-sidebar .nxhs-range-row .rg-label {
+  font-size: 11px;
+  color: #475569;
+}
+
+#nxhs-sidebar .nxhs-range-row .rg-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: #4f46e5;
+  background: #fff;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 5px;
+  padding: 1px 7px;
+  min-width: 38px;
+  text-align: center;
+}
+
+#nxhs-sidebar .nxhs-range-row .rg-pick {
+  background: rgba(99, 102, 241, 0.12);
+  color: #4f46e5;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+
+#nxhs-sidebar .nxhs-range-row .rg-pick:hover {
+  background: rgba(99, 102, 241, 0.22);
+}
